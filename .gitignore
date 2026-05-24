@@ -1,0 +1,37 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Temp
+*.tmp
+*.temp
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+env/
+.env
+
+# Project-specific (VERY IMPORTANT)
+dataset/
+data/
+models/
+attendance.db
+
+# ML / AI files
+*.onnx
+*.pkl
+*.index
+
+# Node (if any frontend later)
+/node_modules/
+package-lock.json

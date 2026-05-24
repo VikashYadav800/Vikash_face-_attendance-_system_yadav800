@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SMS Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<style>
+/* ── RESET & TOKENS ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a14;
+  --bg2:#0f0f2a;
+  --bg3:#130a1e;
+  --surface:rgba(255,255,255,0.04);
+  --border:rgba(255,255,255,0.08);
+  --border2:rgba(255,255,255,0.12);
+  --txt:#f0f0f8;
+  --txt-dim:rgba(240,240,248,0.65);
+  --txt-muted:rgba(240,240,248,0.4);
+  --gold:#FFD700;
+  --orange:#ff9f43;
+  --green:#1dd1a1;
+  --red:#ff6b6b;
+  --purple:#5f27cd;
+  --yellow:#feca57;
+  --font-display:Arial;
+  --font-body:Arial;
+  --radius-sm:8px;
+  --radius:12px;
+  --radius-lg:20px;
+}
+html,body,#root{height:100%;min-height:100vh}
+body{
+  font-family:var(--font-body);
+  background:linear-gradient(135deg,var(--bg) 0%,var(--bg2) 40%,var(--bg3) 70%,#0a1020 100%);
+  color:var(--txt);
+  min-height:100vh;
+}
+
+/* ── AMBIENT ORBS ── */
+.orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0}
+.orb1{top:8%;left:5%;width:500px;height:500px;background:radial-gradient(circle,rgba(255,215,0,0.06) 0%,transparent 70%)}
+.orb2{bottom:5%;right:5%;width:400px;height:400px;background:radial-gradient(circle,rgba(95,39,205,0.09) 0%,transparent 70%)}
+.orb3{top:50%;left:50%;transform:translate(-50%,-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(15,15,42,0.6) 0%,transparent 70%)}
+
+/* ── NAVBAR ── */
+#navbar{
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:68px;
+  background:rgba(10,10,20,0.88);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid rgba(255,255,255,0.07);
+  box-shadow:0 4px 32px rgba(0,0,0,0.4);
+}
+.nav-brand{
+  font-family:var(--font-display);
+  font-weight:800;font-size:20px;letter-spacing:-0.4px;
+  color:var(--txt);white-space:nowrap;
+}
+.nav-brand span{font-weight:400;color:var(--txt-muted);font-size:16px;margin-left:4px}
+.nav-links{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.nav-btn{
+  background:transparent;
+  border:1px solid transparent;
+  color:var(--txt-dim);
+  font-family:var(--font-body);font-size:13px;font-weight:500;
+  padding:7px 14px;border-radius:var(--radius-sm);
+  cursor:pointer;transition:all .2s;letter-spacing:.02em;white-space:nowrap;
+}
+.nav-btn:hover{color:var(--txt)}
+.nav-btn.active{
+  background:rgba(255,215,0,0.13);
+  border-color:rgba(255,215,0,0.35);
+  color:var(--gold);
+}
+.excel-btn{
+  background:rgba(29,209,161,0.12);
+  border:1px solid rgba(29,209,161,0.35);
+  color:var(--green);
+  font-family:var(--font-body);font-size:13px;font-weight:700;
+  padding:7px 14px;border-radius:var(--radius-sm);
+  cursor:pointer;transition:all .2s;margin-left:4px;
+}
+.excel-btn:hover{background:rgba(29,209,161,0.22)}
+.logout-btn{
+  background:rgba(255,80,80,0.12);
+  border:1px solid rgba(255,80,80,0.3);
+  color:var(--red);
+  font-family:var(--font-body);font-size:13px;font-weight:600;
+  padding:7px 16px;border-radius:var(--radius-sm);
+  cursor:pointer;transition:all .2s;margin-left:12px;
+}
+.logout-btn:hover{background:rgba(255,80,80,0.22)}
+
+/* ── MAIN ── */
+#main{
+  position:relative;z-index:1;
+  flex:1;padding:36px 40px;
+  max-width:1300px;margin:0 auto;width:100%;
+}
+.page{display:none}
+.page.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.page-title{
+  font-family:var(--font-display);
+  font-weight:800;font-size:32px;letter-spacing:-1px;
+  margin-bottom:28px;
+  background:linear-gradient(90deg,var(--gold) 0%,var(--orange) 60%,var(--txt) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+
+/* ── STAT CARDS ── */
+.stats-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:18px;margin-bottom:36px;
+}
+.stat-card{
+  background:var(--surface);
+  border-radius:16px;padding:22px 20px;
+  backdrop-filter:blur(8px);
+  position:relative;overflow:hidden;
+  transition:transform .2s;
+}
+.stat-card:hover{transform:translateY(-2px)}
+.stat-glow{
+  position:absolute;top:-18px;right:-18px;
+  width:70px;height:70px;border-radius:50%;
+  opacity:.18;filter:blur(20px);
+}
+.stat-label{
+  font-size:11px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:rgba(240,240,248,.45);margin-bottom:8px;
+}
+.stat-value{
+  font-family:var(--font-display);font-weight:800;font-size:36px;line-height:1;
+}
+
+/* ── CHART BOX ── */
+.chart-box{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:28px;backdrop-filter:blur(8px);margin-bottom:28px;
+}
+.chart-title{
+  font-family:var(--font-display);
+  font-weight:700;font-size:16px;color:var(--txt);
+  margin-bottom:20px;letter-spacing:-.3px;
+}
+
+/* ── TABLE ── */
+.table-wrap{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  overflow:hidden;backdrop-filter:blur(8px);
+}
+table{width:100%;border-collapse:collapse}
+th{
+  padding:14px 20px;text-align:left;
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(240,240,248,.45);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  background:rgba(255,255,255,.03);
+}
+td{
+  padding:14px 20px;font-size:14px;
+  color:rgba(240,240,248,.85);
+  border-bottom:1px solid rgba(255,255,255,.04);
+  transition:background .15s;
+}
+tr:hover td{background:rgba(255,255,255,.03)}
+.no-records{text-align:center;color:rgba(240,240,248,.3);padding:40px!important}
+
+/* ── BADGE ── */
+.badge{
+  display:inline-block;padding:3px 10px;border-radius:99px;
+  font-size:12px;font-weight:600;
+}
+.badge-present{background:rgba(29,209,161,.18);color:var(--green);border:1px solid rgba(29,209,161,.33)}
+.badge-absent{background:rgba(255,107,107,.18);color:var(--red);border:1px solid rgba(255,107,107,.33)}
+.badge-other{background:rgba(255,215,0,.18);color:var(--gold);border:1px solid rgba(255,215,0,.33)}
+
+/* ── FORM INPUTS ── */
+.form-block{margin-bottom:20px}
+label.field-label{
+  display:block;font-size:12px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(240,240,248,.45);margin-bottom:8px;
+}
+input[type="text"],input[type="password"],input[type="date"],input[type="file"]{
+  background:rgba(255,255,255,.06);
+  border:1px solid var(--border2);
+  color:var(--txt);
+  font-family:var(--font-body);font-size:14px;
+  padding:11px 16px;border-radius:10px;
+  outline:none;width:100%;max-width:360px;
+  transition:border-color .2s;
+  color-scheme:dark;
+}
+input[type="text"]:focus,input[type="password"]:focus,input[type="date"]:focus{
+  border-color:rgba(255,215,0,.45);
+}
+input[type="file"]{cursor:pointer;padding:9px 14px}
+.btn-primary{
+  background:linear-gradient(135deg,var(--gold) 0%,var(--orange) 100%);
+  border:none;color:#0a0a14;
+  font-family:var(--font-body);font-weight:700;font-size:14px;
+  padding:11px 28px;border-radius:10px;cursor:pointer;
+  letter-spacing:.03em;transition:opacity .2s,transform .15s;margin-top:4px;
+}
+.btn-primary:hover{opacity:.87;transform:translateY(-1px)}
+.btn-danger{
+  background:linear-gradient(135deg,var(--red) 0%,#ee5a24 100%);
+  border:none;color:#fff;
+  font-family:var(--font-body);font-weight:700;font-size:14px;
+  padding:11px 28px;border-radius:10px;cursor:pointer;
+  letter-spacing:.03em;transition:opacity .2s,transform .15s;margin-top:4px;
+}
+.btn-danger:hover{opacity:.87;transform:translateY(-1px)}
+.row-flex{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+
+/* ── PROFILE GRID ── */
+.profile-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+  gap:18px;
+}
+.profile-card{
+  border-radius:18px;padding:24px 16px;
+  text-align:center;backdrop-filter:blur(8px);
+  position:relative;overflow:hidden;
+  transition:transform .2s,box-shadow .2s;cursor:default;
+}
+.profile-card:hover{transform:translateY(-4px)}
+.profile-avatar{
+  width:60px;height:60px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-weight:800;font-size:22px;color:#fff;
+  margin:0 auto 14px;text-shadow:0 1px 4px rgba(0,0,0,.3);
+}
+.profile-name{
+  font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--txt);
+  letter-spacing:-.2px;
+}
+.profile-id{font-size:12px;color:var(--txt-muted);margin-top:6px}
+
+/* ── LOGIN ── */
+#login-shell{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--bg) 0%,var(--bg2) 40%,var(--bg3) 70%,#0a1020 100%);
+  position:relative;
+}
+.login-orb1{position:fixed;top:15%;left:20%;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(255,215,0,.13) 0%,transparent 70%);pointer-events:none}
+.login-orb2{position:fixed;bottom:10%;right:15%;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(95,39,205,.13) 0%,transparent 70%);pointer-events:none}
+.login-card{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:24px;padding:52px 44px;
+  width:100%;max-width:400px;
+  backdrop-filter:blur(20px);
+  box-shadow:0 32px 80px rgba(0,0,0,.5);
+  position:relative;z-index:1;
+}
+.login-title{
+  font-family:var(--font-display);font-weight:800;font-size:28px;
+  color:var(--txt);margin-bottom:6px;letter-spacing:-.5px;
+}
+.login-sub{color:var(--txt-muted);font-size:14px;margin-bottom:36px}
+.login-card input{max-width:100%;margin-bottom:12px}
+.login-btn{
+  width:100%;
+  background:linear-gradient(135deg,var(--gold) 0%,var(--orange) 100%);
+  border:none;color:#0a0a14;
+  font-family:var(--font-display);font-weight:800;font-size:15px;
+  padding:14px;border-radius:12px;cursor:pointer;
+  letter-spacing:.04em;margin-top:8px;transition:opacity .2s,transform .15s;
+}
+.login-btn:hover{opacity:.88;transform:translateY(-1px)}
+.login-err{
+  color:var(--red);font-size:13px;margin-top:10px;
+  display:none;text-align:center;font-weight:600;
+}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:28px;right:28px;z-index:9999;
+  padding:12px 22px;border-radius:10px;
+  font-family:var(--font-body);font-size:14px;font-weight:600;
+  backdrop-filter:blur(12px);pointer-events:none;
+  opacity:0;transform:translateY(10px);
+  transition:opacity .25s,transform .25s;
+}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.success{background:rgba(29,209,161,.18);border:1px solid rgba(29,209,161,.35);color:var(--green)}
+#toast.error{background:rgba(255,107,107,.18);border:1px solid rgba(255,107,107,.35);color:var(--red)}
+#toast.info{background:rgba(255,215,0,.18);border:1px solid rgba(255,215,0,.35);color:var(--gold)}
+
+/* ── LOADER SPINNER ── */
+.spinner{
+  width:20px;height:20px;border:2px solid rgba(255,255,255,.15);
+  border-top-color:var(--gold);border-radius:50%;
+  animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+
+@media(max-width:900px){
+  #navbar{padding:0 16px;flex-wrap:wrap;height:auto;padding-top:10px;padding-bottom:10px;gap:8px}
+  #main{padding:24px 16px}
+  .page-title{font-size:24px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<div id="login-shell">
+  <div class="login-orb1"></div>
+  <div class="login-orb2"></div>
+  <div class="login-card">
+    <div style="margin-bottom:28px">
+      <div class="login-title">Welcome back</div>
+      <div class="login-sub">Sign in to sms Admin Panel</div>
+    </div>
+    <div class="form-block">
+      <label class="field-label">Username</label>
+      <input type="text" id="inp-user" placeholder="Enter username" autocomplete="username"/>
+    </div>
+    <div class="form-block">
+      <label class="field-label">Password</label>
+      <input type="password" id="inp-pass" placeholder="Enter password" autocomplete="current-password"/>
+    </div>
+    <button class="login-btn" onclick="doLogin()">Sign In →</button>
+    <div class="login-err" id="login-err">Invalid credentials. Please try again.</div>
+  </div>
+</div>
+
+<!-- ══════════════ DASHBOARD SHELL ══════════════ -->
+<div id="app-shell" style="display:none;min-height:100vh;display:none;flex-direction:column">
+  <!-- Orbs -->
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+
+  <!-- NAVBAR -->
+  <nav id="navbar">
+    <div class="nav-brand">School of management sciences lko<span>Admin</span></div>
+    <div class="nav-links">
+      <button class="nav-btn active" data-page="dashboard"  onclick="setPage('dashboard')">Dashboard</button>
+      <button class="nav-btn"        data-page="attendance" onclick="setPage('attendance')">Attendance</button>
+      <button class="nav-btn"        data-page="users"      onclick="setPage('users')">Users</button>
+      <button class="nav-btn"        data-page="search"     onclick="setPage('search')">Search</button>
+      <button class="nav-btn"        data-page="add"        onclick="setPage('add')">Add User</button>
+      <button class="nav-btn"        data-page="delete"     onclick="setPage('delete')">Delete User</button>
+      <button class="excel-btn" onclick="downloadExcel()">⬇ Excel Report</button>
+      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="page-dashboard">
+      <h1 class="page-title">Dashboard</h1>
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card" style="border:1px solid rgba(255,215,0,.2)">
+          <div class="stat-glow" style="background:var(--gold)"></div>
+          <div class="stat-label">Total Employees</div>
+          <div class="stat-value" id="s-employees" style="color:var(--gold)">—</div>
+        </div>
+        <div class="stat-card" style="border:1px solid rgba(29,209,161,.2)">
+          <div class="stat-glow" style="background:var(--green)"></div>
+          <div class="stat-label">Present Today</div>
+          <div class="stat-value" id="s-present" style="color:var(--green)">—</div>
+        </div>
+        <div class="stat-card" style="border:1px solid rgba(255,107,107,.2)">
+          <div class="stat-glow" style="background:var(--red)"></div>
+          <div class="stat-label">Absent Today</div>
+          <div class="stat-value" id="s-absent" style="color:var(--red)">—</div>
+        </div>
+        <div class="stat-card" style="border:1px solid rgba(254,202,87,.2)">
+          <div class="stat-glow" style="background:var(--yellow)"></div>
+          <div class="stat-label">Late Employees</div>
+          <div class="stat-value" id="s-late" style="color:var(--yellow)">—</div>
+        </div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Monthly Attendance Overview</div>
+        <canvas id="attend-chart" height="90"></canvas>
+      </div>
+    </div>
+
+    <!-- ── ATTENDANCE ── -->
+    <div class="page" id="page-attendance">
+      <h1 class="page-title">Attendance by Date</h1>
+      <div class="row-flex">
+        <input type="date" id="att-date" style="max-width:200px;margin-bottom:0"/>
+        <button class="btn-primary" onclick="searchAttendance()">Search</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Name</th><th>Status</th><th>Working Hours</th>
+          </tr></thead>
+          <tbody id="att-tbody">
+            <tr><td class="no-records" colspan="4">Select a date and click Search</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── USERS ── -->
+    <div class="page" id="page-users">
+      <h1 class="page-title">All Users</h1>
+      <div class="profile-grid" id="users-grid">
+        <p style="color:var(--txt-muted)">Loading…</p>
+      </div>
+    </div>
+
+    <!-- ── SEARCH ── -->
+    <div class="page" id="page-search">
+      <h1 class="page-title">Search User</h1>
+      <div class="row-flex">
+        <input type="text" id="search-name" placeholder="Enter name…" style="margin-bottom:0"/>
+        <button class="btn-primary" onclick="searchUser()">Search</button>
+      </div>
+      <div class="profile-grid" id="search-grid"></div>
+    </div>
+
+    <!-- ── ADD USER ── -->
+    <div class="page" id="page-add">
+      <h1 class="page-title">Add User</h1>
+      <div style="max-width:440px">
+        <div class="form-block">
+          <label class="field-label">Full Name</label>
+          <input type="text" id="add-name" placeholder="Enter name…"/>
+        </div>
+        <div class="form-block">
+          <label class="field-label">Profile Image</label>
+          <input type="file" id="add-image" accept="image/*"/>
+        </div>
+        <button class="btn-primary" onclick="addUser()">Add User →</button>
+      </div>
+    </div>
+
+    <!-- ── DELETE USER ── -->
+    <div class="page" id="page-delete">
+      <h1 class="page-title">Delete User</h1>
+      <div style="max-width:440px">
+        <div class="form-block">
+          <label class="field-label">User Name</label>
+          <input type="text" id="del-name" placeholder="Enter name to delete…"/>
+        </div>
+        <button class="btn-danger" onclick="deleteUser()">Delete User</button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app-shell -->
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+/* ─────────────────────────────────────────
+   CONFIG — all endpoints on single port 8000
+───────────────────────────────────────── */
+const API = "http://localhost:8000";
+
+/* ─────────────────────────────────────────
+   PALETTE
+───────────────────────────────────────── */
+const PALETTES = [
+  ["#ff6b6b","#feca57"],["#48dbfb","#ff9ff3"],["#54a0ff","#5f27cd"],
+  ["#1dd1a1","#10ac84"],["#ffd32a","#ff9f43"],["#ee5a24","#c0392b"],
+  ["#0abde3","#006ba6"],["#f368e0","#833471"],["#00d2d3","#01aaa4"],
+  ["#ff9f43","#ee5a24"],
+];
+const palette = (i) => PALETTES[Math.abs(i) % PALETTES.length];
+
+/* ─────────────────────────────────────────
+   TOAST
+───────────────────────────────────────── */
+let _toastTimer;
+function toast(msg, type = "info") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ""; }, 3200);
+}
+
+/* ─────────────────────────────────────────
+   AUTH
+───────────────────────────────────────── */
+function doLogin() {
+  const user = document.getElementById("inp-user").value.trim();
+  const pass = document.getElementById("inp-pass").value;
+  if (user === "sms" && pass === "sms@123") {
+    localStorage.setItem("admin", "true");
+    document.getElementById("login-shell").style.display = "none";
+    document.getElementById("app-shell").style.display = "flex";
+    loadDashboard();
+  } else {
+    document.getElementById("login-err").style.display = "block";
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem("admin");
+  document.getElementById("app-shell").style.display = "none";
+  document.getElementById("login-shell").style.display = "flex";
+  document.getElementById("inp-pass").value = "";
+  document.getElementById("login-err").style.display = "none";
+}
+
+// allow Enter key on login
+document.getElementById("inp-pass").addEventListener("keydown", e => {
+  if (e.key === "Enter") doLogin();
+});
+document.getElementById("inp-user").addEventListener("keydown", e => {
+  if (e.key === "Enter") doLogin();
+});
+
+/* ─────────────────────────────────────────
+   PAGE ROUTING
+───────────────────────────────────────── */
+let currentPage = "dashboard";
+
+function setPage(id) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById("page-" + id).classList.add("active");
+  document.querySelectorAll(".nav-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.page === id);
+  });
+  currentPage = id;
+  if (id === "users") loadUsers();
+}
+
+/* ─────────────────────────────────────────
+   CHART
+───────────────────────────────────────── */
+let chartInstance = null;
+
+function renderChart(labels, presentData, absentData) {
+  const ctx = document.getElementById("attend-chart").getContext("2d");
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: "Present", data: presentData, backgroundColor: "#1dd1a1", borderRadius: 6 },
+        { label: "Absent",  data: absentData,  backgroundColor: "#ff6b6b", borderRadius: 6 },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: "rgba(240,240,248,0.7)", font: { family: "'DM Sans'" } } },
+        tooltip: {
+          backgroundColor: "rgba(10,10,20,0.9)",
+          borderColor: "rgba(255,255,255,0.08)", borderWidth: 1,
+          titleColor: "#FFD700", bodyColor: "#f0f0f8",
+        },
+      },
+      scales: {
+        x: { ticks: { color: "rgba(240,240,248,0.5)", font: { family: "'DM Sans'" } }, grid: { color: "rgba(255,255,255,0.04)" } },
+        y: { ticks: { color: "rgba(240,240,248,0.5)", font: { family: "'DM Sans'" } }, grid: { color: "rgba(255,255,255,0.06)" } },
+      },
+    },
+  });
+}
+
+/* ─────────────────────────────────────────
+   DASHBOARD
+───────────────────────────────────────── */
+async function loadDashboard() {
+  try {
+    const res  = await fetch(`${API}/dashboard-stats`);
+    const data = await res.json();
+    const s    = data.stats || {};
+    document.getElementById("s-employees").textContent = s.employees ?? "—";
+    document.getElementById("s-present").textContent   = s.present   ?? "—";
+    document.getElementById("s-absent").textContent    = s.absent    ?? "—";
+    document.getElementById("s-late").textContent      = s.late      ?? "—";
+
+    const weekly = data.weekly || [];
+    renderChart(
+      weekly.map(w => w.day),
+      weekly.map(w => w.present),
+      weekly.map(w => w.absent),
+    );
+  } catch (e) {
+    console.error("Dashboard load failed:", e);
+    toast("Failed to load dashboard", "error");
+  }
+}
+
+/* ─────────────────────────────────────────
+   ATTENDANCE
+───────────────────────────────────────── */
+function badgeFor(status) {
+  if (!status) return `<span class="badge badge-other">—</span>`;
+  const low = status.toLowerCase();
+  if (low.includes("in") || low === "present" || low === "checked in" || low === "completed")
+    return `<span class="badge badge-present">${status}</span>`;
+  if (low === "absent")
+    return `<span class="badge badge-absent">${status}</span>`;
+  return `<span class="badge badge-other">${status}</span>`;
+}
+
+async function searchAttendance() {
+  const date = document.getElementById("att-date").value;
+  if (!date) { toast("Please select a date", "error"); return; }
+  try {
+    const res  = await fetch(`${API}/attendance-by-date?date=${date}`);
+    const data = await res.json();
+    const tbody = document.getElementById("att-tbody");
+    if (!data || data.length === 0) {
+      tbody.innerHTML = `<tr><td class="no-records" colspan="4">No records found for ${date}</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map(emp => `
+      <tr>
+        <td>${emp.id}</td>
+        <td style="font-weight:500">${emp.name}</td>
+        <td>${badgeFor(emp.status)}</td>
+        <td>${emp.working_hours}</td>
+      </tr>
+    `).join("");
+  } catch (e) {
+    toast("Error fetching attendance", "error");
+  }
+}
+
+/* ─────────────────────────────────────────
+   USERS
+───────────────────────────────────────── */
+function userCard(name, index, subtext = "") {
+  const [c1, c2] = palette(index);
+  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return `
+    <div class="profile-card"
+      style="background:linear-gradient(145deg,${c1}22,${c2}22);border:1px solid ${c1}44"
+      onmouseover="this.style.boxShadow='0 16px 40px ${c1}33'"
+      onmouseout="this.style.boxShadow='none'">
+      <div class="profile-avatar" style="background:linear-gradient(135deg,${c1},${c2});box-shadow:0 4px 20px ${c1}55">${initials}</div>
+      <div class="profile-name">${name}</div>
+      ${subtext ? `<div class="profile-id">${subtext}</div>` : ""}
+    </div>
+  `;
+}
+
+async function loadUsers() {
+  const grid = document.getElementById("users-grid");
+  grid.innerHTML = `<div style="color:var(--txt-muted)"><span class="spinner"></span> Loading…</div>`;
+  try {
+    const res  = await fetch(`${API}/users`);
+    const data = await res.json();
+    const users = data.users || [];
+    if (users.length === 0) {
+      grid.innerHTML = `<p style="color:var(--txt-muted)">No users found.</p>`;
+      return;
+    }
+    grid.innerHTML = users.map((u, i) => userCard(u, i)).join("");
+  } catch (e) {
+    grid.innerHTML = `<p style="color:var(--red)">Failed to load users.</p>`;
+  }
+}
+
+/* ─────────────────────────────────────────
+   SEARCH USER
+───────────────────────────────────────── */
+async function searchUser() {
+  const name = document.getElementById("search-name").value.trim();
+  if (!name) { toast("Enter a name to search", "error"); return; }
+  const grid = document.getElementById("search-grid");
+  grid.innerHTML = "";
+  try {
+    const res  = await fetch(`${API}/search-user/${encodeURIComponent(name)}`);
+    const data = await res.json();
+    if (!data.found || !data.data || data.data.length === 0) {
+      toast("User not found", "error"); return;
+    }
+    grid.innerHTML = data.data.map((r, i) => userCard(r[1], r[0], `ID: ${r[0]}`)).join("");
+  } catch (e) {
+    toast("Search failed", "error");
+  }
+}
+
+/* ─────────────────────────────────────────
+   ADD USER
+───────────────────────────────────────── */
+async function addUser() {
+  const name  = document.getElementById("add-name").value.trim();
+  const file  = document.getElementById("add-image").files[0];
+  if (!name || !file) { toast("Enter name and upload image", "error"); return; }
+
+  const form = new FormData();
+  form.append("name", name);
+  form.append("image", file);
+
+  try {
+    const res  = await fetch(`${API}/add-user`, { method: "POST", body: form });
+    const data = await res.json();
+    toast(data.message, data.status === "success" ? "success" : "error");
+    if (data.status === "success") {
+      document.getElementById("add-name").value = "";
+      document.getElementById("add-image").value = "";
+      loadDashboard();
+    }
+  } catch (e) {
+    toast("Upload failed", "error");
+  }
+}
+
+/* ─────────────────────────────────────────
+   DELETE USER
+───────────────────────────────────────── */
+async function deleteUser() {
+  const name = document.getElementById("del-name").value.trim();
+  if (!name) { toast("Enter a user name", "error"); return; }
+
+  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+
+  try {
+    const res  = await fetch(`${API}/delete-user/${encodeURIComponent(name)}`, { method: "DELETE" });
+    const data = await res.json();
+    toast(data.message, data.status === "success" ? "success" : "error");
+    if (data.status === "success") {
+      document.getElementById("del-name").value = "";
+      loadDashboard();
+    }
+  } catch (e) {
+    toast("Delete failed", "error");
+  }
+}
+
+/* ─────────────────────────────────────────
+   EXCEL DOWNLOAD
+───────────────────────────────────────── */
+function downloadExcel() {
+  window.open(`${API}/yearly-attendance`);
+}
+
+/* ─────────────────────────────────────────
+   BOOT
+───────────────────────────────────────── */
+(function init() {
+  if (localStorage.getItem("admin")) {
+    document.getElementById("login-shell").style.display = "none";
+    document.getElementById("app-shell").style.display = "flex";
+    loadDashboard();
+  } else {
+    document.getElementById("login-shell").style.display = "flex";
+    document.getElementById("app-shell").style.display = "none";
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Face Attendance </title>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+<style>
+:root{
+    --bg-dark:#070e1a;
+    --bg-card:rgba(255,255,255,0.03);
+    --border-glass:rgba(255,255,255,0.1);
+    --text-main:#ffffff;
+    --text-muted:#94a3b8;
+    --accent-teal:#00f2fe;
+    --success-green:#10b981;
+    --error-red:#ef4444;
+}
+body{
+    font-family:'Inter',sans-serif;
+    background-color:var(--bg-dark);
+    color:var(--text-main);
+    margin:0;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+}
+.wrapper{width:450px}
+.header-logo{text-align:center;margin-bottom:25px}
+.header-logo img{max-width:180px}
+.screen{
+    display:none;
+    background:var(--bg-card);
+    backdrop-filter:blur(25px);
+    border:1px solid var(--border-glass);
+    border-radius:32px;
+    padding:40px;
+    text-align:center;
+}
+.screen.active{display:block}
+.camera-box{
+    width:240px;
+    height:240px;
+    margin:auto;
+    border-radius:50%;
+    overflow:hidden;
+    border:4px solid var(--error-red); 
+    transition: border-color 0.3s;
+}
+.camera-box.live{border-color: var(--success-green);} 
+video{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    transform:scaleX(-1);
+}
+.success-badge{
+    width:65px;
+    height:65px;
+    border-radius:50%;
+    border:3px solid var(--success-green);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:28px;
+    margin:auto;
+    color:var(--success-green);
+}
+.btn{
+    width:100%;
+    background:var(--accent-teal);
+    color:#000;
+    border:none;
+    padding:18px;
+    border-radius:16px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:15px;
+}
+.btn:disabled{ opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="header-logo"><img src="kraft.png"></div>
+
+    <div class="screen active" id="page-scan">
+        <h1>Face Attendance</h1>
+        <p id="instruction" style="color:var(--text-muted);font-size:14px;margin-bottom:25px">
+            Blink and turn head to verify
+        </p>
+
+        <div class="camera-box" id="camera-box">
+            <video id="video" autoplay muted playsinline></video>
+        </div>
+
+        <div id="status" style="margin:20px 0;color:var(--text-muted);font-weight:600;">Initializing GPS...</div>
+
+        <button id="verify-btn" class="btn" style="display:none;" disabled>Verify Identity</button> 
+    </div>
+
+    <div class="screen" id="page-success">
+        <div class="success-badge">✓</div>
+        <h2 id="greet-msg">Welcome!</h2>
+        <p id="sub-status" style="color:var(--success-green)">Verified Successfully</p>
+        <p>Name: <b id="res-name">---</b></p>
+        <p>Status: <b id="res-log">---</b></p>
+        <p>Time: <b id="res-time">--:--</b></p>
+        <button class="btn" onclick="showScanner()">Continue</button>
+    </div>
+</div>
+
+<script>
+const video = document.getElementById("video");
+const verifyBtn = document.getElementById("verify-btn");
+const statusText = document.getElementById("status");
+const cameraBox = document.getElementById("camera-box");
+const API = "http://localhost:8000/match-image";
+
+const OFFICE_LAT = 26.853673392214176;
+const OFFICE_LON = 80.94804262883552;
+const MAX_RADIUS_METERS = 20000;
+
+let userLat=null, userLon=null, gpsAllowed=false;
+let blinkDetected=false, headMoved=false, requestSent=false;
+let greetingLock = false;
+
+// --- VOICE AI FUNCTION ---
+function speak(text) {
+    window.speechSynthesis.cancel(); // Stop current speech
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+}
+
+function getTimeBasedGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+}
+
+// 1. GPS RACKING
+if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            userLat = pos.coords.latitude;
+            userLon = pos.coords.longitude;
+            const dist = getDistance(userLat, userLon, OFFICE_LAT, OFFICE_LON);
+            if(dist <= MAX_RADIUS_METERS){
+                gpsAllowed = true;
+                statusText.innerText="Inside office location ";
+                statusText.style.color="var(--success-green)";
+            } else {
+                statusText.innerText=`Outside Range (${Math.round(dist)}m)`;
+                statusText.style.color="var(--error-red)";
+                speak("You are outside the office range. Access blocked.");
+            }
+            updateVerifyButton();
+        },
+        () => { 
+            statusText.innerText="GPS access denied."; 
+            speak("Please enable location services.");
+        },
+        {enableHighAccuracy: true}
+    );
+}
+
+function getDistance(lat1,lon1,lat2,lon2){
+    const R=6371e3;
+    const dLat=(lat2-lat1)*Math.PI/180;
+    const dLon=(lon2-lon1)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function updateVerifyButton(){
+    verifyBtn.style.display="block";
+    if(blinkDetected && headMoved && gpsAllowed){
+        verifyBtn.disabled = false;
+        cameraBox.classList.add("live");
+        statusText.innerText = "Liveness Verified ";
+        statusText.style.color = "var(--success-green)";
+        
+        if(!greetingLock){
+            speak(getTimeBasedGreeting() + " You can now verify your identity.");
+            greetingLock = true;
+        }
+    }
+}
+
+// 2. MEDIAPIPE LIVENESS
+let headXHistory = [];
+const faceMesh = new FaceMesh({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+faceMesh.setOptions({maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.6, minTrackingConfidence:0.6});
+faceMesh.onResults(onResults);
+
+const camera = new Camera(video,{
+    onFrame: async()=>{ await faceMesh.send({image: video}) },
+    width:640, height:480
+});
+camera.start();
+
+function onResults(results){
+    if(!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0){
+        statusText.innerText = "No face detected.";
+        return;
+    }
+    
+    const landmarks = results.multiFaceLandmarks[0];
+
+    // EAR (Blink Logic)
+    const leftEAR = getEAR(landmarks[362], landmarks[385], landmarks[387], landmarks[263], landmarks[373], landmarks[380]);
+    const rightEAR = getEAR(landmarks[33], landmarks[159], landmarks[158], landmarks[133], landmarks[145], landmarks[153]);
+    const avgEAR = (leftEAR + rightEAR) / 2;
+    if(avgEAR < 0.16) blinkDetected = true;
+
+    // Head Movement
+    const nose = landmarks[1];
+    headXHistory.push(nose.x);
+    if(headXHistory.length > 20) headXHistory.shift();
+    const movement = Math.max(...headXHistory) - Math.min(...headXHistory);
+    if(movement > 0.06) headMoved = true;
+
+    if(!blinkDetected || !headMoved) {
+        if(!blinkDetected && !headMoved) statusText.innerText = "Blink and turn head.";
+        else if(!blinkDetected) statusText.innerText = "Blink your eyes.";
+        else statusText.innerText = "Turn your head.";
+    }
+
+    updateVerifyButton();
+}
+
+function getEAR(pLeft, pTop1, pTop2, pRight, pBottom1, pBottom2) {
+    const v1 = Math.hypot(pTop1.x - pBottom2.x, pTop1.y - pBottom2.y);
+    const v2 = Math.hypot(pTop2.x - pBottom1.x, pTop2.y - pBottom1.y);
+    const h = Math.hypot(pLeft.x - pRight.x, pLeft.y - pRight.y);
+    return (v1 + v2) / (2 * h);
+}
+
+// 3. BACKEND COMMUNICATION
+verifyBtn.addEventListener("click", () => {
+    if(requestSent) return;
+    requestSent = true;
+    verifyBtn.innerText = "Processing...";
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob(blob => {
+        const form = new FormData();
+        form.append("file", blob, "capture.jpg");
+        form.append("lat", userLat);
+        form.append("lon", userLon);
+
+        fetch(API, { method: "POST", body: form })
+        .then(res => res.json())
+        .then(data => {
+            if(data.match){
+                document.getElementById("res-name").innerText = data.name;
+                document.getElementById("res-log").innerText = data.attendance;
+                document.getElementById("res-time").innerText = new Date().toLocaleTimeString();
+                document.getElementById("greet-msg").innerText = "Hello, " + data.name;
+
+                document.getElementById("page-scan").classList.remove("active");
+                document.getElementById("page-success").classList.add("active");
+
+                // VOICE FEEDBACK FOR SUCCESS
+                speak("Attendance verified. " + data.name + ", your status is " + data.attendance);
+            } else {
+                statusText.innerText = "Identity Not Found. Please try again.";
+                statusText.style.color = "var(--error-red)";
+                speak("Identification failed. Please try again.");
+                // Reset liveness so user must blink + turn again before retrying
+                requestSent = false;
+                blinkDetected = false;
+                headMoved = false;
+                headXHistory = [];
+                greetingLock = false;
+                cameraBox.classList.remove("live");
+                verifyBtn.disabled = true;
+                verifyBtn.innerText = "Verify Identity";
+                statusText.innerText = "Liveness reset — blink and turn head again.";
+            }
+        })
+        .catch(() => {
+            statusText.innerText = "Server Error — check connection.";
+            statusText.style.color = "var(--error-red)";
+            speak("Server error. Please check your connection.");
+            requestSent = false;
+            verifyBtn.innerText = "Verify Identity";
+        });
+    }, "image/jpeg");
+});
+
+function showScanner(){
+    blinkDetected = false; headMoved = false; requestSent = false;
+    greetingLock = false; headXHistory = [];
+    verifyBtn.innerText = "Verify Identity";
+    document.getElementById("page-success").classList.remove("active");
+    document.getElementById("page-scan").classList.add("active");
+    statusText.innerText = "System ready.";
+    statusText.style.color = "var(--text-muted)";
+    cameraBox.classList.remove("live");
+    updateVerifyButton();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+fastapi==0.133.1
+uvicorn==0.41.0
+numpy==2.4.2
+opencv-python== 4.13.0.92
+faiss-cpu==1.13.2
+mysql-connector-python==9.6.0
+insightface==0.7.3
+python-multipart==0.0.22
+pip install openpyxl==3.1.5

@@ -1,0 +1,10 @@
+modules
+/modules
+.env
+env*
+.env.local
+venv
+pycache/
+*.pyc
+*.pyo
+*.pyd
